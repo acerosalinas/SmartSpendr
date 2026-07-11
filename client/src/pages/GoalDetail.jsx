@@ -5,6 +5,7 @@ import DonutProgress from "../components/DonutProgress.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import client from "../api/client.js";
 import { formatCurrency, formatMonthLabel } from "../utils/format.js";
+import { useToast } from "../context/ToastContext.jsx";
 
 export default function GoalDetail() {
   const { id } = useParams();
@@ -13,7 +14,7 @@ export default function GoalDetail() {
   const [months, setMonths] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [error, setError] = useState("");
+  const toast = useToast();
 
   async function load() {
     setLoading(true);
@@ -23,7 +24,9 @@ export default function GoalDetail() {
       setGoal(data.goal);
       setMonths(data.months);
     } catch (err) {
-      setLoadError(err.response?.data?.error || "Could not load this goal");
+      const message = err.response?.data?.error || "Could not load this goal";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -31,10 +34,10 @@ export default function GoalDetail() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function toggleMonth(month) {
-    setError("");
     const previousGoal = goal;
     const previousMonths = months;
 
@@ -50,14 +53,19 @@ export default function GoalDetail() {
     } catch (err) {
       setGoal(previousGoal);
       setMonths(previousMonths);
-      setError(err.response?.data?.error || "Could not update month");
+      toast.error(err.response?.data?.error || "Could not update month");
     }
   }
 
   async function handleDelete() {
     if (!confirm(`Delete "${goal.goal_name}"? This cannot be undone.`)) return;
-    await client.delete(`/goals/${id}`);
-    navigate("/goals");
+    try {
+      await client.delete(`/goals/${id}`);
+      toast.success("Goal deleted");
+      navigate("/goals");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not delete goal");
+    }
   }
 
   if (loading) {
@@ -117,8 +125,6 @@ export default function GoalDetail() {
             <ProgressBar percent={goal.progress_percent} />
           </div>
         </div>
-
-        {error && <p className="mt-4 text-sm text-red-500">{error}</p>}
 
         <div className="card mt-6 p-6">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-subtle">

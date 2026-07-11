@@ -1,6 +1,7 @@
 import { useState } from "react";
 import client from "../api/client.js";
 import { useCategories } from "../hooks/useCategories.js";
+import { useToast } from "../context/ToastContext.jsx";
 
 const TYPE_LABELS = {
   expense: "Expense",
@@ -15,23 +16,23 @@ export default function CategoriesManager() {
   const { categories, loading, refresh } = useCategories();
   const [name, setName] = useState("");
   const [type, setType] = useState("expense");
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState("expense");
+  const toast = useToast();
 
   async function handleAdd(e) {
     e.preventDefault();
-    setError("");
-    if (!name.trim()) return setError("Category name is required");
+    if (!name.trim()) return toast.error("Category name is required");
     setSubmitting(true);
     try {
       await client.post("/categories", { name: name.trim(), type });
       setName("");
       await refresh();
+      toast.success("Category added");
     } catch (err) {
-      setError(err.response?.data?.error || "Could not add category");
+      toast.error(err.response?.data?.error || "Could not add category");
     } finally {
       setSubmitting(false);
     }
@@ -41,29 +42,28 @@ export default function CategoriesManager() {
     setEditingId(category.id);
     setEditName(category.name);
     setEditType(category.type);
-    setError("");
   }
 
   async function handleSaveEdit(id) {
-    if (!editName.trim()) return setError("Category name is required");
-    setError("");
+    if (!editName.trim()) return toast.error("Category name is required");
     try {
       await client.put(`/categories/${id}`, { name: editName.trim(), type: editType });
       setEditingId(null);
       await refresh();
+      toast.success("Category updated");
     } catch (err) {
-      setError(err.response?.data?.error || "Could not update category");
+      toast.error(err.response?.data?.error || "Could not update category");
     }
   }
 
   async function handleDelete(id) {
     if (!confirm("Delete this category?")) return;
-    setError("");
     try {
       await client.delete(`/categories/${id}`);
       await refresh();
+      toast.success("Category deleted");
     } catch (err) {
-      setError(err.response?.data?.error || "Could not delete category");
+      toast.error(err.response?.data?.error || "Could not delete category");
     }
   }
 
@@ -94,8 +94,6 @@ export default function CategoriesManager() {
           + Add
         </button>
       </form>
-
-      {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
       {loading ? (
         <p className="text-sm text-subtle">Loading categories...</p>

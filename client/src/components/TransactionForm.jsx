@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useToast } from "../context/ToastContext.jsx";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const TYPE_ORDER = ["expense", "income", "savings", "debt", "bill"];
@@ -25,8 +26,8 @@ export default function TransactionForm({ categories, initial, onSubmit, onClose
   const [categoryType, setCategoryType] = useState(() => findInitialType(categories, initial));
   const [categoryId, setCategoryId] = useState(initial?.category_id || "");
   const [notes, setNotes] = useState(initial?.notes || "");
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   const categoriesForType = useMemo(
     () => categories.filter((c) => c.type === categoryType),
@@ -41,13 +42,12 @@ export default function TransactionForm({ categories, initial, onSubmit, onClose
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
 
     const amountNum = Number(amount);
-    if (!txnDate) return setError("Date is required");
-    if (!Number.isFinite(amountNum) || amountNum <= 0) return setError("Amount must be a positive number");
-    if (!description.trim()) return setError("Description is required");
-    if (!categoryId) return setError("Category is required");
+    if (!txnDate) return toast.error("Date is required");
+    if (!Number.isFinite(amountNum) || amountNum <= 0) return toast.error("Amount must be a positive number");
+    if (!description.trim()) return toast.error("Description is required");
+    if (!categoryId) return toast.error("Category is required");
 
     setSubmitting(true);
     try {
@@ -59,7 +59,7 @@ export default function TransactionForm({ categories, initial, onSubmit, onClose
         notes: notes.trim(),
       });
     } catch (err) {
-      setError(err.response?.data?.error || "Could not save transaction");
+      toast.error(err.response?.data?.error || "Could not save transaction");
     } finally {
       setSubmitting(false);
     }
@@ -140,8 +140,6 @@ export default function TransactionForm({ categories, initial, onSubmit, onClose
               rows={2}
             />
           </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-outline">

@@ -4,6 +4,7 @@ import TransactionForm from "../components/TransactionForm.jsx";
 import client from "../api/client.js";
 import { useMonth } from "../context/MonthContext.jsx";
 import { useCategories } from "../hooks/useCategories.js";
+import { useToast } from "../context/ToastContext.jsx";
 import { formatCurrency, formatDate } from "../utils/format.js";
 
 const TYPE_LABELS = {
@@ -22,6 +23,7 @@ export default function ExpenseLog() {
   const [loadError, setLoadError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const toast = useToast();
 
   async function load() {
     setLoading(true);
@@ -30,7 +32,9 @@ export default function ExpenseLog() {
       const { data } = await client.get("/transactions", { params: { month: currentMonth } });
       setTransactions(data.transactions);
     } catch (err) {
-      setLoadError(err.response?.data?.error || "Could not load the transaction log");
+      const message = err.response?.data?.error || "Could not load the transaction log";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -45,18 +49,25 @@ export default function ExpenseLog() {
     await client.post("/transactions", payload);
     setShowForm(false);
     await load();
+    toast.success("Transaction added");
   }
 
   async function handleUpdate(payload) {
     await client.put(`/transactions/${editing.id}`, payload);
     setEditing(null);
     await load();
+    toast.success("Transaction updated");
   }
 
   async function handleDelete(id) {
     if (!confirm("Delete this transaction?")) return;
-    await client.delete(`/transactions/${id}`);
-    await load();
+    try {
+      await client.delete(`/transactions/${id}`);
+      await load();
+      toast.success("Transaction deleted");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not delete transaction");
+    }
   }
 
   const subtotalsByType = useMemo(() => {

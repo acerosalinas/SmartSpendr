@@ -4,6 +4,7 @@ import DebtBillForm from "../components/DebtBillForm.jsx";
 import client from "../api/client.js";
 import { useMonth } from "../context/MonthContext.jsx";
 import { useCategories } from "../hooks/useCategories.js";
+import { useToast } from "../context/ToastContext.jsx";
 import { formatCurrency, formatDate } from "../utils/format.js";
 
 const FILTERS = [
@@ -25,6 +26,7 @@ export default function DebtBills() {
   const [loadError, setLoadError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [kind, setKind] = useState("");
+  const toast = useToast();
 
   async function load() {
     setLoading(true);
@@ -35,7 +37,9 @@ export default function DebtBills() {
       });
       setItems(data.items);
     } catch (err) {
-      setLoadError(err.response?.data?.error || "Could not load debt & bills");
+      const message = err.response?.data?.error || "Could not load debt & bills";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -50,6 +54,7 @@ export default function DebtBills() {
     await client.post("/debt-bills", payload);
     setShowForm(false);
     await load();
+    toast.success("Item added");
   }
 
   async function toggleCompleted(item) {
@@ -58,15 +63,21 @@ export default function DebtBills() {
     );
     try {
       await client.patch(`/debt-bills/${item.id}`, { is_completed: !item.is_completed });
-    } catch {
+    } catch (err) {
       await load();
+      toast.error(err.response?.data?.error || "Could not update item");
     }
   }
 
   async function handleDelete(id) {
     if (!confirm("Delete this item?")) return;
-    await client.delete(`/debt-bills/${id}`);
-    await load();
+    try {
+      await client.delete(`/debt-bills/${id}`);
+      await load();
+      toast.success("Item deleted");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not delete item");
+    }
   }
 
   return (

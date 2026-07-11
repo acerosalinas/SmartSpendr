@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout.jsx";
 import client from "../api/client.js";
 import { useMonth } from "../context/MonthContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 import { formatCurrency } from "../utils/format.js";
 
 function ExpectedInput({ row, month, onSaved }) {
   const [value, setValue] = useState(row.expected);
   const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
   useEffect(() => setValue(row.expected), [row.expected]);
 
@@ -20,6 +22,9 @@ function ExpectedInput({ row, month, onSaved }) {
     try {
       await client.put("/budgets", { category_id: row.category_id, month, expected_amount: amount });
       onSaved();
+    } catch (err) {
+      setValue(row.expected);
+      toast.error(err.response?.data?.error || "Could not update budget");
     } finally {
       setSaving(false);
     }
@@ -44,6 +49,7 @@ export default function CategorySummary() {
   const [summary, setSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const toast = useToast();
 
   async function load() {
     setLoading(true);
@@ -52,7 +58,9 @@ export default function CategorySummary() {
       const { data } = await client.get("/category-summary", { params: { month: currentMonth } });
       setSummary(data.summary);
     } catch (err) {
-      setLoadError(err.response?.data?.error || "Could not load category summary");
+      const message = err.response?.data?.error || "Could not load category summary";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -111,7 +119,7 @@ export default function CategorySummary() {
                     <td className="px-4 py-3 text-right text-heading">{formatCurrency(row.actual)}</td>
                     <td
                       className="px-4 py-3 text-right font-medium"
-                      style={{ color: row.balance < 0 ? "#ef4444" : "var(--text)" }}
+                      style={{ color: row.balance < 0 ? "#ef4444" : "#22c55e" }}
                     >
                       {formatCurrency(row.balance)}
                     </td>
@@ -125,7 +133,7 @@ export default function CategorySummary() {
                   <td className="px-4 py-3 text-right text-heading">{formatCurrency(totals.actual)}</td>
                   <td
                     className="px-4 py-3 text-right"
-                    style={{ color: totals.balance < 0 ? "#ef4444" : "var(--text)" }}
+                    style={{ color: totals.balance < 0 ? "#ef4444" : "#22c55e" }}
                   >
                     {formatCurrency(totals.balance)}
                   </td>

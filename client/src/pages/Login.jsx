@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 import AnimatedRing from "../components/AnimatedRing.jsx";
 import { IconCheck } from "../components/icons.jsx";
 
@@ -15,18 +16,17 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
     setSubmitting(true);
     try {
       await login(email, password);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.error || "Login failed");
+      toast.error(err.response?.data?.error || "Login failed");
     } finally {
       setSubmitting(false);
     }
@@ -121,8 +121,6 @@ export default function Login() {
                 className="field-input"
               />
             </div>
-
-            {error && <p className="text-sm text-red-500">{error}</p>}
 
             <button type="submit" disabled={submitting} className="btn-accent w-full">
               {submitting ? "Logging in..." : "Log In"}

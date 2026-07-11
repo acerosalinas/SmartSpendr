@@ -2,32 +2,28 @@ import { useState } from "react";
 import Layout from "../components/Layout.jsx";
 import client from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 
 export default function Profile() {
   const { user, setUser } = useAuth();
   const [fullName, setFullName] = useState(user?.full_name || "");
   const [email, setEmail] = useState(user?.email || "");
-  const [profileMessage, setProfileMessage] = useState("");
-  const [profileError, setProfileError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [passwordMessage, setPasswordMessage] = useState("");
-  const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const toast = useToast();
 
   async function handleProfileSubmit(e) {
     e.preventDefault();
-    setProfileMessage("");
-    setProfileError("");
     setSavingProfile(true);
     try {
       const { data } = await client.put("/auth/profile", { full_name: fullName, email });
       setUser(data.user);
-      setProfileMessage("Profile updated");
+      toast.success("Profile updated");
     } catch (err) {
-      setProfileError(err.response?.data?.error || "Could not update profile");
+      toast.error(err.response?.data?.error || "Could not update profile");
     } finally {
       setSavingProfile(false);
     }
@@ -35,8 +31,6 @@ export default function Profile() {
 
   async function handlePasswordSubmit(e) {
     e.preventDefault();
-    setPasswordMessage("");
-    setPasswordError("");
     setSavingPassword(true);
     try {
       await client.put("/auth/password", {
@@ -45,9 +39,9 @@ export default function Profile() {
       });
       setCurrentPassword("");
       setNewPassword("");
-      setPasswordMessage("Password updated");
+      toast.success("Password updated");
     } catch (err) {
-      setPasswordError(err.response?.data?.error || "Could not update password");
+      toast.error(err.response?.data?.error || "Could not update password");
     } finally {
       setSavingPassword(false);
     }
@@ -78,8 +72,6 @@ export default function Profile() {
               className="field-input"
             />
           </div>
-          {profileMessage && <p className="text-sm text-emerald-500">{profileMessage}</p>}
-          {profileError && <p className="text-sm text-red-500">{profileError}</p>}
           <button type="submit" disabled={savingProfile} className="btn-accent">
             {savingProfile ? "Saving..." : "Save Changes"}
           </button>
@@ -107,8 +99,6 @@ export default function Profile() {
               className="field-input"
             />
           </div>
-          {passwordMessage && <p className="text-sm text-emerald-500">{passwordMessage}</p>}
-          {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
           <button type="submit" disabled={savingPassword} className="btn-accent">
             {savingPassword ? "Saving..." : "Update Password"}
           </button>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "../context/ToastContext.jsx";
 
 const todayFirstOfMonth = () => {
   const now = new Date();
@@ -11,18 +12,18 @@ export default function GoalForm({ onSubmit, onClose }) {
   const [periodMonths, setPeriodMonths] = useState("");
   const [bank, setBank] = useState("");
   const [startingMonth, setStartingMonth] = useState(todayFirstOfMonth());
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
 
     const amount = Number(targetAmount);
     const months = Number(periodMonths);
-    if (!goalName.trim()) return setError("Goal name is required");
-    if (!Number.isFinite(amount) || amount <= 0) return setError("Target amount must be a positive number");
-    if (!Number.isInteger(months) || months <= 0) return setError("Period must be a positive whole number of months");
+    if (!goalName.trim()) return toast.error("Goal name is required");
+    if (!Number.isFinite(amount) || amount <= 0) return toast.error("Target amount must be a positive number");
+    if (!Number.isInteger(months) || months <= 0)
+      return toast.error("Period must be a positive whole number of months");
 
     setSubmitting(true);
     try {
@@ -34,7 +35,7 @@ export default function GoalForm({ onSubmit, onClose }) {
         starting_month: startingMonth,
       });
     } catch (err) {
-      setError(err.response?.data?.error || "Could not create goal");
+      toast.error(err.response?.data?.error || "Could not create goal");
     } finally {
       setSubmitting(false);
     }
@@ -104,8 +105,6 @@ export default function GoalForm({ onSubmit, onClose }) {
               className="field-input"
             />
           </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-outline">

@@ -4,6 +4,7 @@ import Layout from "../components/Layout.jsx";
 import GoalCard from "../components/GoalCard.jsx";
 import GoalForm from "../components/GoalForm.jsx";
 import client from "../api/client.js";
+import { useToast } from "../context/ToastContext.jsx";
 
 export default function Goals() {
   const [goals, setGoals] = useState([]);
@@ -11,6 +12,7 @@ export default function Goals() {
   const [loadError, setLoadError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const navigate = useNavigate();
+  const toast = useToast();
 
   async function loadGoals() {
     setLoading(true);
@@ -19,7 +21,9 @@ export default function Goals() {
       const { data } = await client.get("/goals");
       setGoals(data.goals);
     } catch (err) {
-      setLoadError(err.response?.data?.error || "Could not load goals");
+      const message = err.response?.data?.error || "Could not load goals";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -27,11 +31,13 @@ export default function Goals() {
 
   useEffect(() => {
     loadGoals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleCreate(payload) {
     const { data } = await client.post("/goals", payload);
     setShowForm(false);
+    toast.success("Goal created");
     navigate(`/goals/${data.goal.id}`);
   }
 

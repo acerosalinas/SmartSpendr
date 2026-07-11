@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 
 export default function Register() {
   const { register } = useAuth();
@@ -9,28 +10,28 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      toast.error("Passwords do not match");
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      toast.error("Password must be at least 8 characters");
       return;
     }
 
     setSubmitting(true);
     try {
       await register(fullName, email, password);
+      toast.success("Account created — you can now log in");
       navigate("/login");
     } catch (err) {
-      setError(err.response?.data?.error || "Registration failed");
+      toast.error(err.response?.data?.error || "Registration failed");
     } finally {
       setSubmitting(false);
     }
@@ -88,8 +89,6 @@ export default function Register() {
               className="field-input"
             />
           </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
 
           <button type="submit" disabled={submitting} className="btn-accent w-full">
             {submitting ? "Creating account..." : "Create Account"}

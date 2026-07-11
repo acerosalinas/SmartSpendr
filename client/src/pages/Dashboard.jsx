@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Layout from "../components/Layout.jsx";
 import client from "../api/client.js";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useMonth } from "../context/MonthContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 import { formatCurrency, formatPercent } from "../utils/format.js";
 
 const ROLLUP_ROWS = [
@@ -37,9 +38,48 @@ function GoalChartTooltip({ active, payload }) {
   );
 }
 
+function RollupChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="card px-3 py-2 text-xs">
+      <p className="font-semibold text-heading">{label}</p>
+      {payload.map((p) => (
+        <p key={p.dataKey} className="text-subtle">
+          {p.name}: {formatCurrency(p.value)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function ViewToggle({ view, onChange }) {
+  return (
+    <div className="inline-flex overflow-hidden rounded-lg border divider">
+      {[
+        { id: "table", label: "Table" },
+        { id: "chart", label: "Chart" },
+      ].map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => onChange(opt.id)}
+          className="px-3 py-1.5 text-sm font-medium transition-colors"
+          style={{
+            backgroundColor: view === opt.id ? "var(--accent)" : "transparent",
+            color: view === opt.id ? "var(--on-accent)" : "var(--text-muted)",
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function StartingBalanceEditor({ rollup, month, onSaved }) {
   const [value, setValue] = useState(rollup.starting_balance.actual);
   const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
   useEffect(() => setValue(rollup.starting_balance.actual), [rollup.starting_balance.actual]);
 
@@ -50,6 +90,9 @@ function StartingBalanceEditor({ rollup, month, onSaved }) {
     try {
       await client.put(`/months/${month}/starting-balance`, { amount });
       onSaved();
+    } catch (err) {
+      setValue(rollup.starting_balance.actual);
+      toast.error(err.response?.data?.error || "Could not update starting balance");
     } finally {
       setSaving(false);
     }
@@ -70,9 +113,12 @@ function StartingBalanceEditor({ rollup, month, onSaved }) {
 
 function MonthlyOverviewSection() {
   const { currentMonth } = useMonth();
+  const { theme } = useTheme();
   const [rollup, setRollup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [view, setView] = useState("table");
+  const toast = useToast();
 
   async function load() {
     setLoading(true);
@@ -81,7 +127,9 @@ function MonthlyOverviewSection() {
       const { data } = await client.get(`/months/${currentMonth}/rollup`);
       setRollup(data.rollup);
     } catch (err) {
-      setLoadError(err.response?.data?.error || "Could not load the monthly overview");
+      const message = err.response?.data?.error || "Could not load the monthly overview";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -94,6 +142,16 @@ function MonthlyOverviewSection() {
 
   if (loading) return <p className="text-subtle">Loading...</p>;
   if (loadError) return <p className="text-sm text-red-500">{loadError}</p>;
+
+  const chartData = [
+    { name: "Starting Balance", expected: rollup.starting_balance.expected, actual: rollup.starting_balance.actual },
+    ...ROLLUP_ROWS.map(({ key, label }) => ({
+      name: label,
+      expected: rollup[key].expected,
+      actual: rollup[key].actual,
+    })),
+    { name: "Ending Balance", expected: rollup.left.expected, actual: rollup.left.actual },
+  ];
 
   return (
     <>
@@ -108,6 +166,40 @@ function MonthlyOverviewSection() {
         </p>
       )}
 
+      <div className="mt-4 flex justify-end">
+        <ViewToggle view={view} onChange={setView} />
+      </div>
+
+      {view === "chart" ? (
+        <div className="card mt-4 p-6">
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={chartData} margin={{ left: 8, right: 24 }}>
+              <CartesianGrid vertical={false} stroke={theme.border} />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: theme.textMuted, fontSize: 12 }}
+                axisLine={{ stroke: theme.border }}
+                tickLine={false}
+                interval={0}
+                angle={-20}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis
+                tickFormatter={(v) => formatCurrency(v)}
+                tick={{ fill: theme.textMuted, fontSize: 12 }}
+                axisLine={{ stroke: theme.border }}
+                tickLine={false}
+                width={90}
+              />
+              <Tooltip content={<RollupChartTooltip />} cursor={{ fill: theme.accentSoft }} />
+              <Legend wrapperStyle={{ fontSize: 12, color: theme.textMuted }} />
+              <Bar dataKey="expected" name="Expected" fill={theme.textMuted} radius={[4, 4, 0, 0]} maxBarSize={28} />
+              <Bar dataKey="actual" name="Actual" fill={theme.accent} radius={[4, 4, 0, 0]} maxBarSize={28} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
       <div className="card mt-4 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -150,6 +242,7 @@ function MonthlyOverviewSection() {
           </table>
         </div>
       </div>
+      )}
     </>
   );
 }
@@ -159,13 +252,19 @@ function GoalsProgressSection() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const { theme } = useTheme();
+  const toast = useToast();
 
   useEffect(() => {
     client
       .get("/dashboard")
       .then((res) => setData(res.data))
-      .catch((err) => setLoadError(err.response?.data?.error || "Could not load goals progress"))
+      .catch((err) => {
+        const message = err.response?.data?.error || "Could not load goals progress";
+        setLoadError(message);
+        toast.error(message);
+      })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) return <p className="text-subtle">Loading...</p>;

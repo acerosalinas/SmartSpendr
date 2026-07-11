@@ -4,25 +4,25 @@ import CategoriesManager from "../components/CategoriesManager.jsx";
 import client from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 
 export default function Settings() {
   const { user, setUser } = useAuth();
   const { themeId, themes, setThemeId } = useTheme();
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const toast = useToast();
 
   async function handleSelect(id) {
     if (id === themeId || saving) return;
     const previous = themeId;
     setThemeId(id);
     setSaving(true);
-    setError("");
     try {
       const { data } = await client.put("/auth/theme", { theme: id });
       setUser(data.user);
     } catch (err) {
       setThemeId(previous);
-      setError(err.response?.data?.error || "Could not save theme");
+      toast.error(err.response?.data?.error || "Could not save theme");
     } finally {
       setSaving(false);
     }
@@ -37,8 +37,6 @@ export default function Settings() {
             Pick a color combination for your account. It applies everywhere and is saved to your
             profile, {user?.full_name}.
           </p>
-
-          {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {themes.map((t) => (
