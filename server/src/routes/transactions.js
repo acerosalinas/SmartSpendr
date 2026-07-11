@@ -35,7 +35,7 @@ router.get("/", asyncHandler(async (req, res) => {
     `SELECT t.*, c.name AS category_name, c.type AS category_type
      FROM transactions t
      JOIN categories c ON c.id = t.category_id
-     WHERE t.user_id = ? AND DATE_FORMAT(t.txn_date, '%Y-%m-01') = ?
+     WHERE t.user_id = ? AND to_char(t.txn_date, 'YYYY-MM-01') = ?
      ORDER BY t.txn_date DESC, t.created_at DESC`,
     [req.user.id, month]
   );

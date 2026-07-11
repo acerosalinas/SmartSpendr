@@ -41,7 +41,7 @@ router.post("/", asyncHandler(async (req, res) => {
       type,
     ]);
   } catch (err) {
-    if (err.code === "ER_DUP_ENTRY") {
+    if (err.code === "23505") {
       return res.status(409).json({ error: "A category with this name already exists" });
     }
     throw err;
@@ -71,7 +71,7 @@ router.put("/:id", asyncHandler(async (req, res) => {
       req.params.id,
     ]);
   } catch (err) {
-    if (err.code === "ER_DUP_ENTRY") {
+    if (err.code === "23505") {
       return res.status(409).json({ error: "A category with this name already exists" });
     }
     throw err;
@@ -91,7 +91,7 @@ router.delete("/:id", asyncHandler(async (req, res) => {
   try {
     await pool.query("DELETE FROM categories WHERE id = ?", [req.params.id]);
   } catch (err) {
-    if (err.code === "ER_ROW_IS_REFERENCED_2" || err.code === "ER_ROW_IS_REFERENCED") {
+    if (err.code === "23503") {
       return res.status(409).json({
         error: "This category is used by existing entries and can't be deleted",
       });

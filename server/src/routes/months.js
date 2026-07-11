@@ -27,7 +27,7 @@ router.post("/", asyncHandler(async (req, res) => {
   if (!month) return res.status(400).json({ error: "A valid month (YYYY-MM) is required" });
 
   await pool.query(
-    "INSERT IGNORE INTO months (id, user_id, month) VALUES (?, ?, ?)",
+    "INSERT INTO months (id, user_id, month) VALUES (?, ?, ?) ON CONFLICT (user_id, month) DO NOTHING",
     [crypto.randomUUID(), req.user.id, month]
   );
   res.status(201).json({ month });
@@ -42,7 +42,7 @@ router.put("/:month/starting-balance", asyncHandler(async (req, res) => {
 
   await pool.query(
     `INSERT INTO months (id, user_id, month, starting_balance_override) VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE starting_balance_override = VALUES(starting_balance_override)`,
+     ON CONFLICT (user_id, month) DO UPDATE SET starting_balance_override = EXCLUDED.starting_balance_override`,
     [crypto.randomUUID(), req.user.id, month, amount]
   );
 

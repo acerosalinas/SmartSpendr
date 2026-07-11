@@ -24,7 +24,7 @@ router.get("/", asyncHandler(async (req, res) => {
      LEFT JOIN (
        SELECT category_id, SUM(amount) AS actual_amount
        FROM transactions
-       WHERE user_id = ? AND DATE_FORMAT(txn_date, '%Y-%m-01') = ?
+       WHERE user_id = ? AND to_char(txn_date, 'YYYY-MM-01') = ?
        GROUP BY category_id
      ) t ON t.category_id = c.id
      WHERE c.user_id = ? AND c.type = 'expense'

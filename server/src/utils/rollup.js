@@ -8,7 +8,7 @@ async function getCategoryTypeTotals(userId, month, type) {
        COALESCE((
          SELECT SUM(t.amount) FROM transactions t
          JOIN categories tc ON tc.id = t.category_id
-         WHERE t.user_id = ? AND tc.type = ? AND DATE_FORMAT(t.txn_date, '%Y-%m-01') = ?
+         WHERE t.user_id = ? AND tc.type = ? AND to_char(t.txn_date, 'YYYY-MM-01') = ?
        ), 0) AS actual
      FROM categories c
      LEFT JOIN category_budgets cb

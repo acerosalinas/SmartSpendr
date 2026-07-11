@@ -53,7 +53,7 @@ router.put("/", asyncHandler(async (req, res) => {
   await pool.query(
     `INSERT INTO category_budgets (id, user_id, category_id, month, expected_amount)
      VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE expected_amount = VALUES(expected_amount)`,
+     ON CONFLICT (user_id, category_id, month) DO UPDATE SET expected_amount = EXCLUDED.expected_amount`,
     [crypto.randomUUID(), req.user.id, category_id, month, amountNum]
   );
   await ensureMonthExists(req.user.id, month);

@@ -1,17 +1,18 @@
 # SmartSpendr — Goal Tracker & Budget App
 
 ## Stack
-- Backend: Node.js + Express + MySQL (`mysql2`), JWT auth, bcrypt — `server/`
+- Backend: Node.js + Express + PostgreSQL (`pg`), JWT auth, bcrypt — `server/`
 - Frontend: React (Vite) + Tailwind CSS + Recharts + React Router — `client/`
 
-## 1. Database setup
-1. Open phpMyAdmin, go to the **SQL** tab (on any database).
-2. Run the contents of [`server/sql/schema.sql`](server/sql/schema.sql) — it creates the `milestone` database and its three tables (`users`, `goals`, `goal_months`).
+## 1. Database setup (Supabase)
+1. Create a project at [supabase.com](https://supabase.com).
+2. In the Supabase dashboard, open **SQL Editor** and run the contents of [`server/sql/schema.sql`](server/sql/schema.sql) — it creates all tables (`users`, `goals`, `goal_months`, `categories`, `transactions`, `category_budgets`, `debt_bill_items`, `months`).
+3. Go to **Project Settings → Database → Connection string** and copy the **Transaction pooler** URI (port 6543) — this is your `DATABASE_URL`.
 
 ## 2. Backend setup
 ```
 cd server
-cp .env.example .env   # then edit DB_USER / DB_PASSWORD / JWT_SECRET to match your setup
+cp .env.example .env   # then set DATABASE_URL (from step 1) and JWT_SECRET
 npm install
 npm run dev             # http://localhost:4001
 ```
@@ -37,6 +38,13 @@ Dashboard, My Goals, Profile, and Settings live in a collapsible sidebar (deskto
 ## Notes
 - All monetary values are formatted in PHP (₱) via `Intl.NumberFormat`.
 - JWTs are stored in `localStorage` (`smartspendr_token`) and attached as `Authorization: Bearer <token>` on every API request.
-- IDs are generated with `crypto.randomUUID()` in the app layer (not MySQL's `UUID()`), so this works on any MySQL/MariaDB version.
+- IDs are generated with `crypto.randomUUID()` in the app layer (not a database-generated UUID), so no Postgres extension is required.
 - Theme is stored per-account in `users.theme` and re-applied on login; the sidebar's collapsed/expanded state is a local per-browser preference (`localStorage`).
-"# SmartSpendr" 
+
+## 5. Deploying (Vercel)
+Deploy `client/` and `server/` as two separate Vercel projects (both already have their own `vercel.json`):
+
+1. **Server project** — root directory `server/`. Add environment variables in the Vercel dashboard: `DATABASE_URL` (Supabase pooled connection string), `JWT_SECRET`, `JWT_EXPIRES_IN`, `CLIENT_ORIGIN` (the client project's deployed URL). Vercel runs `server/api/index.js`, which exports the Express app as a serverless function; `server/vercel.json` rewrites all paths to it.
+2. **Client project** — root directory `client/`. Add `VITE_API_URL` pointing at the deployed server, e.g. `https://<server-project>.vercel.app/api`.
+3. Push to `main` (or redeploy from the dashboard) to trigger both deployments.
+
