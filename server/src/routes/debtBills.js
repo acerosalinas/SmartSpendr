@@ -17,7 +17,7 @@ async function fetchItemWithRollup(itemId, userId) {
        COALESCE((
          SELECT SUM(t.amount) FROM transactions t
          WHERE t.user_id = d.user_id AND t.category_id = d.category_id
-           AND to_char(t.txn_date, 'YYYY-MM-01') = d.month
+           AND date_trunc('month', t.txn_date)::date = d.month
        ), 0) AS actual
      FROM debt_bill_items d
      JOIN categories c ON c.id = d.category_id
@@ -42,7 +42,7 @@ router.get("/", asyncHandler(async (req, res) => {
        COALESCE((
          SELECT SUM(t.amount) FROM transactions t
          WHERE t.user_id = d.user_id AND t.category_id = d.category_id
-           AND to_char(t.txn_date, 'YYYY-MM-01') = d.month
+           AND date_trunc('month', t.txn_date)::date = d.month
        ), 0) AS actual
     FROM debt_bill_items d
     JOIN categories c ON c.id = d.category_id
