@@ -18,12 +18,13 @@ async function fetchCategoryOwnedByUser(categoryId, userId) {
 }
 
 function validateTransactionInput(body) {
-  const { txn_date, amount, description, category_id } = body;
+  const { txn_date, amount, description, category_id, account } = body;
   if (!txn_date || !normalizeMonth(txn_date)) return "A valid date is required";
   const amountNum = Number(amount);
   if (!Number.isFinite(amountNum) || amountNum <= 0) return "Amount must be a positive number";
   if (!description?.trim()) return "Description is required";
   if (!category_id) return "Category is required";
+  if (account && !["cash", "bank"].includes(account)) return "Account must be cash or bank";
   return null;
 }
 
@@ -46,16 +47,16 @@ router.post("/", asyncHandler(async (req, res) => {
   const validationError = validateTransactionInput(req.body);
   if (validationError) return res.status(400).json({ error: validationError });
 
-  const { txn_date, amount, description, category_id, notes } = req.body;
+  const { txn_date, amount, description, category_id, notes, account } = req.body;
   const category = await fetchCategoryOwnedByUser(category_id, req.user.id);
   if (!category) return res.status(400).json({ error: "Invalid category" });
 
   const id = crypto.randomUUID();
   const month = normalizeMonth(txn_date);
   await pool.query(
-    `INSERT INTO transactions (id, user_id, category_id, txn_date, amount, description, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, req.user.id, category_id, txn_date, Number(amount), description.trim(), notes?.trim() || null]
+    `INSERT INTO transactions (id, user_id, category_id, txn_date, amount, description, notes, account)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, req.user.id, category_id, txn_date, Number(amount), description.trim(), notes?.trim() || null, account || "bank"]
   );
   await ensureMonthExists(req.user.id, month);
 
@@ -77,14 +78,14 @@ router.put("/:id", asyncHandler(async (req, res) => {
   ]);
   if (!existing[0]) return res.status(404).json({ error: "Transaction not found" });
 
-  const { txn_date, amount, description, category_id, notes } = req.body;
+  const { txn_date, amount, description, category_id, notes, account } = req.body;
   const category = await fetchCategoryOwnedByUser(category_id, req.user.id);
   if (!category) return res.status(400).json({ error: "Invalid category" });
 
   await pool.query(
-    `UPDATE transactions SET txn_date = ?, amount = ?, description = ?, category_id = ?, notes = ?
+    `UPDATE transactions SET txn_date = ?, amount = ?, description = ?, category_id = ?, notes = ?, account = ?
      WHERE id = ?`,
-    [txn_date, Number(amount), description.trim(), category_id, notes?.trim() || null, req.params.id]
+    [txn_date, Number(amount), description.trim(), category_id, notes?.trim() || null, account || "bank", req.params.id]
   );
   await ensureMonthExists(req.user.id, normalizeMonth(txn_date));
 

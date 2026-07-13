@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import DonutProgress from "../components/DonutProgress.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
+import GoalForm from "../components/GoalForm.jsx";
 import client from "../api/client.js";
 import { formatCurrency, formatMonthLabel } from "../utils/format.js";
 import { useToast } from "../context/ToastContext.jsx";
@@ -14,6 +15,7 @@ export default function GoalDetail() {
   const [months, setMonths] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [showEditForm, setShowEditForm] = useState(false);
   const toast = useToast();
 
   async function load() {
@@ -68,6 +70,14 @@ export default function GoalDetail() {
     }
   }
 
+  async function handleEditSubmit(payload) {
+    const { data } = await client.put(`/goals/${id}`, payload);
+    setGoal(data.goal);
+    setMonths(data.months);
+    setShowEditForm(false);
+    toast.success("Goal updated");
+  }
+
   if (loading) {
     return (
       <Layout title="Goal Details">
@@ -94,7 +104,12 @@ export default function GoalDetail() {
           &larr; Back to My Goals
         </button>
 
-        <h2 className="mb-4 text-center text-2xl font-bold text-heading">{goal.goal_name}</h2>
+        <div className="mb-4 flex items-center justify-center gap-2">
+          <h2 className="text-center text-2xl font-bold text-heading">{goal.goal_name}</h2>
+          <button onClick={() => setShowEditForm(true)} className="text-sm link-accent">
+            Edit
+          </button>
+        </div>
 
         <div className="card p-6">
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
@@ -162,6 +177,10 @@ export default function GoalDetail() {
           </button>
         </div>
       </div>
+
+      {showEditForm && (
+        <GoalForm initial={goal} onSubmit={handleEditSubmit} onClose={() => setShowEditForm(false)} />
+      )}
     </Layout>
   );
 }

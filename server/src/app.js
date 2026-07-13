@@ -10,6 +10,8 @@ import transactionsRoutes from "./routes/transactions.js";
 import budgetsRoutes from "./routes/budgets.js";
 import categorySummaryRoutes from "./routes/categorySummary.js";
 import debtBillsRoutes from "./routes/debtBills.js";
+import debtPlansRoutes from "./routes/debtPlans.js";
+import savingsRoutes from "./routes/savings.js";
 import monthsRoutes from "./routes/months.js";
 
 const app = express();
@@ -33,6 +35,8 @@ app.use("/api/transactions", transactionsRoutes);
 app.use("/api/budgets", budgetsRoutes);
 app.use("/api/category-summary", categorySummaryRoutes);
 app.use("/api/debt-bills", debtBillsRoutes);
+app.use("/api/debt-plans", debtPlansRoutes);
+app.use("/api/savings", savingsRoutes);
 app.use("/api/months", monthsRoutes);
 
 app.use((err, req, res, next) => {

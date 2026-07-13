@@ -8,6 +8,7 @@ import {
   IconGrid,
   IconLogout,
   IconPieChart,
+  IconPiggyBank,
   IconReceipt,
   IconUser,
 } from "./icons.jsx";
@@ -20,6 +21,10 @@ const NAV_GROUPS = [
   {
     label: "Goals",
     items: [{ to: "/goals", label: "My Goals", Icon: IconFlag }],
+  },
+  {
+    label: "Savings",
+    items: [{ to: "/personal-savings", label: "Personal Savings", Icon: IconPiggyBank }],
   },
   {
     label: "Expense Tracker",

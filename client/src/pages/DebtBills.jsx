@@ -50,11 +50,18 @@ export default function DebtBills() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth, kind]);
 
-  async function handleCreate(payload) {
+  async function handleCreateSingle(payload) {
     await client.post("/debt-bills", payload);
     setShowForm(false);
     await load();
     toast.success("Item added");
+  }
+
+  async function handleCreatePlan(payload) {
+    const { data } = await client.post("/debt-plans", payload);
+    setShowForm(false);
+    await load();
+    toast.success(`Installment plan created (${data.months_created} months)`);
   }
 
   async function toggleCompleted(item) {
@@ -125,6 +132,7 @@ export default function DebtBills() {
                 <tr className="border-b divider">
                   <th className="px-4 py-3 font-semibold text-subtle">Done</th>
                   <th className="px-4 py-3 font-semibold text-subtle">Category</th>
+                  <th className="px-4 py-3 font-semibold text-subtle">Bank</th>
                   <th className="px-4 py-3 font-semibold text-subtle">Due Date</th>
                   <th className="px-4 py-3 text-right font-semibold text-subtle">Expected</th>
                   <th className="px-4 py-3 text-right font-semibold text-subtle">Actual</th>
@@ -158,6 +166,7 @@ export default function DebtBills() {
                         </span>
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-subtle">{item.bank || "—"}</td>
                     <td className="px-4 py-3 text-heading">{formatDate(item.due_date)}</td>
                     <td className="px-4 py-3 text-right text-heading">{formatCurrency(item.expected)}</td>
                     <td className="px-4 py-3 text-right text-heading">{formatCurrency(item.actual)}</td>
@@ -178,7 +187,8 @@ export default function DebtBills() {
         <DebtBillForm
           categories={debtBillCategories}
           month={currentMonth}
-          onSubmit={handleCreate}
+          onSubmitSingle={handleCreateSingle}
+          onSubmitPlan={handleCreatePlan}
           onClose={() => setShowForm(false)}
         />
       )}

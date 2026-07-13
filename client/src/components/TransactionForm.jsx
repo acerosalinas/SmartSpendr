@@ -11,20 +11,26 @@ const TYPE_LABELS = {
   bill: "Bill",
 };
 
-function findInitialType(categories, initial) {
+function findInitialType(categories, initial, defaultType) {
   if (initial) {
     const match = categories.find((c) => c.id === initial.category_id);
     if (match) return match.type;
   }
+  if (defaultType && categories.some((c) => c.type === defaultType)) return defaultType;
   return categories[0]?.type || "expense";
 }
 
-export default function TransactionForm({ categories, initial, onSubmit, onClose }) {
+export default function TransactionForm({ categories, initial, defaultType, onSubmit, onClose }) {
   const [txnDate, setTxnDate] = useState(initial?.txn_date?.slice(0, 10) || todayISO());
   const [amount, setAmount] = useState(initial?.amount ?? "");
   const [description, setDescription] = useState(initial?.description || "");
-  const [categoryType, setCategoryType] = useState(() => findInitialType(categories, initial));
-  const [categoryId, setCategoryId] = useState(initial?.category_id || "");
+  const [categoryType, setCategoryType] = useState(() => findInitialType(categories, initial, defaultType));
+  const [categoryId, setCategoryId] = useState(() => {
+    if (initial?.category_id) return initial.category_id;
+    const initialType = findInitialType(categories, initial, defaultType);
+    return categories.find((c) => c.type === initialType)?.id || "";
+  });
+  const [account, setAccount] = useState(initial?.account || "bank");
   const [notes, setNotes] = useState(initial?.notes || "");
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
@@ -56,6 +62,7 @@ export default function TransactionForm({ categories, initial, onSubmit, onClose
         amount: amountNum,
         description: description.trim(),
         category_id: categoryId,
+        account,
         notes: notes.trim(),
       });
     } catch (err) {
@@ -128,6 +135,30 @@ export default function TransactionForm({ categories, initial, onSubmit, onClose
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="field-label">Account</label>
+            <div className="flex gap-2">
+              {[
+                { value: "cash", label: "Cash on Hand" },
+                { value: "bank", label: "Cash in Bank" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAccount(opt.value)}
+                  className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors divider"
+                  style={
+                    account === opt.value
+                      ? { backgroundColor: "var(--accent-soft)", color: "var(--accent)", borderColor: "var(--accent)" }
+                      : { color: "var(--text-muted)" }
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
 

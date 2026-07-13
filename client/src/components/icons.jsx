@@ -128,6 +128,20 @@ export function IconAlertCircle(props) {
   );
 }
 
+export function IconPiggyBank(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path
+        d="M4 12c0-3.6 3.1-6.5 7-6.5 2.4 0 4.5 1.1 5.8 2.8L20 8v4l-2 .7c-.3 1-.9 1.9-1.7 2.6V18h-2.5v-1.2a8 8 0 0 1-1.8.2c-.5 0-1-.05-1.5-.15V18H8v-2.1C5.6 15 4 13.7 4 12Z"
+        strokeLinejoin="round"
+      />
+      <circle cx="15.5" cy="10.5" r="0.6" fill="currentColor" stroke="none" />
+      <path d="M7 12H5.5" strokeLinecap="round" />
+      <path d="M11 5.5V4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IconInfo(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>

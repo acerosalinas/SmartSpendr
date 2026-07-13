@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   amount DECIMAL(12,2) NOT NULL,
   description VARCHAR(255) NOT NULL,
   notes VARCHAR(500),
+  account VARCHAR(4) NOT NULL DEFAULT 'bank' CHECK (account IN ('cash', 'bank')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -92,15 +93,37 @@ CREATE TABLE IF NOT EXISTS debt_bill_items (
 
 CREATE INDEX IF NOT EXISTS idx_debt_bill_user_month ON debt_bill_items(user_id, month);
 
--- Registry of months the user has started tracking, plus an optional
--- manual starting balance override (only meaningful for the earliest
--- month -- every later month's starting balance is carried over
--- automatically from the previous month's computed "Left" balance).
+-- Multi-month installment debt plans: a total amount split evenly across
+-- period_months, generating one debt_bill_items row per month (mirrors
+-- how goals/goal_months splits a goal's target_amount across its period).
+CREATE TABLE IF NOT EXISTS debt_plans (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category_id VARCHAR(36) NOT NULL REFERENCES categories(id),
+  bank VARCHAR(100),
+  total_amount DECIMAL(12,2) NOT NULL,
+  period_months INT NOT NULL,
+  starting_month DATE NOT NULL,
+  due_day INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_debt_plans_user ON debt_plans(user_id);
+
+ALTER TABLE debt_bill_items ADD COLUMN IF NOT EXISTS plan_id VARCHAR(36) REFERENCES debt_plans(id) ON DELETE CASCADE;
+ALTER TABLE debt_bill_items ADD COLUMN IF NOT EXISTS installment_amount DECIMAL(12,2) NULL;
+ALTER TABLE debt_bill_items ADD COLUMN IF NOT EXISTS bank VARCHAR(100) NULL;
+
+-- Registry of months the user has started tracking, plus optional manual
+-- starting balance overrides for cash and bank (only meaningful for the
+-- earliest month -- every later month's starting balance is carried over
+-- automatically from the previous month's computed ending balance).
 CREATE TABLE IF NOT EXISTS months (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   month DATE NOT NULL,
-  starting_balance_override DECIMAL(12,2) NULL,
+  cash_starting_override DECIMAL(12,2) NULL,
+  bank_starting_override DECIMAL(12,2) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uniq_user_month UNIQUE (user_id, month)
 );

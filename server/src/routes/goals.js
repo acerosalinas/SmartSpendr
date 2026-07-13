@@ -102,6 +102,36 @@ router.get("/:id", asyncHandler(async (req, res) => {
   res.json({ goal: withProgress({ ...goal, amount_saved: amountSaved }), months });
 }));
 
+// Editable fields are limited to goal_name and bank. target_amount,
+// period_months, and starting_month stay fixed after creation because they
+// define the already-generated goal_months schedule (including any months
+// already checked off) -- users who need to change those delete and
+// recreate the goal.
+router.put("/:id", asyncHandler(async (req, res) => {
+  const goal = await fetchGoalOwnedByUser(req.params.id, req.user.id);
+  if (!goal) return res.status(404).json({ error: "Goal not found" });
+
+  const { goal_name, bank } = req.body;
+  if (!goal_name?.trim()) return res.status(400).json({ error: "Goal name is required" });
+
+  await pool.query("UPDATE goals SET goal_name = ?, bank = ? WHERE id = ?", [
+    goal_name.trim(),
+    bank?.trim() || null,
+    req.params.id,
+  ]);
+
+  const [months] = await pool.query(
+    "SELECT * FROM goal_months WHERE goal_id = ? ORDER BY month_number ASC",
+    [req.params.id]
+  );
+  const amountSaved = months
+    .filter((m) => m.is_completed)
+    .reduce((sum, m) => sum + Number(m.target_amount), 0);
+
+  const updatedGoal = await fetchGoalOwnedByUser(req.params.id, req.user.id);
+  res.json({ goal: withProgress({ ...updatedGoal, amount_saved: amountSaved }), months });
+}));
+
 router.delete("/:id", asyncHandler(async (req, res) => {
   const goal = await fetchGoalOwnedByUser(req.params.id, req.user.id);
   if (!goal) return res.status(404).json({ error: "Goal not found" });

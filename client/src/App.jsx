@@ -9,6 +9,7 @@ import Settings from "./pages/Settings.jsx";
 import ExpenseLog from "./pages/ExpenseLog.jsx";
 import CategorySummary from "./pages/CategorySummary.jsx";
 import DebtBills from "./pages/DebtBills.jsx";
+import PersonalSavings from "./pages/PersonalSavings.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
@@ -77,6 +78,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <DebtBills />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/personal-savings"
+        element={
+          <ProtectedRoute>
+            <PersonalSavings />
           </ProtectedRoute>
         }
       />

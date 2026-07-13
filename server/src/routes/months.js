@@ -11,13 +11,13 @@ router.use(requireAuth);
 
 router.get("/", asyncHandler(async (req, res) => {
   const [rows] = await pool.query(
-    "SELECT month, starting_balance_override FROM months WHERE user_id = ? ORDER BY month ASC",
+    "SELECT month, cash_starting_override, bank_starting_override FROM months WHERE user_id = ? ORDER BY month ASC",
     [req.user.id]
   );
   res.json({
     months: rows.map((r) => ({
       month: r.month,
-      has_override: r.starting_balance_override !== null,
+      has_override: r.cash_starting_override !== null || r.bank_starting_override !== null,
     })),
   });
 }));
@@ -37,13 +37,18 @@ router.put("/:month/starting-balance", asyncHandler(async (req, res) => {
   const month = normalizeMonth(req.params.month);
   if (!month) return res.status(400).json({ error: "A valid month (YYYY-MM) is required" });
 
-  const amount = Number(req.body.amount);
-  if (!Number.isFinite(amount)) return res.status(400).json({ error: "Amount must be a number" });
+  const cashAmount = Number(req.body.cash_amount);
+  const bankAmount = Number(req.body.bank_amount);
+  if (!Number.isFinite(cashAmount) || !Number.isFinite(bankAmount)) {
+    return res.status(400).json({ error: "Cash and bank amounts must both be numbers" });
+  }
 
   await pool.query(
-    `INSERT INTO months (id, user_id, month, starting_balance_override) VALUES (?, ?, ?, ?)
-     ON CONFLICT (user_id, month) DO UPDATE SET starting_balance_override = EXCLUDED.starting_balance_override`,
-    [crypto.randomUUID(), req.user.id, month, amount]
+    `INSERT INTO months (id, user_id, month, cash_starting_override, bank_starting_override) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (user_id, month) DO UPDATE SET
+       cash_starting_override = EXCLUDED.cash_starting_override,
+       bank_starting_override = EXCLUDED.bank_starting_override`,
+    [crypto.randomUUID(), req.user.id, month, cashAmount, bankAmount]
   );
 
   const rollup = await computeMonthRollup(req.user.id, month);

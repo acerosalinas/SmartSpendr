@@ -77,21 +77,29 @@ function ViewToggle({ view, onChange }) {
 }
 
 function StartingBalanceEditor({ rollup, month, onSaved }) {
-  const [value, setValue] = useState(rollup.starting_balance.actual);
+  const [cashValue, setCashValue] = useState(rollup.accounts.cash.starting);
+  const [bankValue, setBankValue] = useState(rollup.accounts.bank.starting);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
-  useEffect(() => setValue(rollup.starting_balance.actual), [rollup.starting_balance.actual]);
+  useEffect(() => setCashValue(rollup.accounts.cash.starting), [rollup.accounts.cash.starting]);
+  useEffect(() => setBankValue(rollup.accounts.bank.starting), [rollup.accounts.bank.starting]);
 
   async function save() {
-    const amount = Number(value);
-    if (!Number.isFinite(amount)) return setValue(rollup.starting_balance.actual);
+    const cashAmount = Number(cashValue);
+    const bankAmount = Number(bankValue);
+    if (!Number.isFinite(cashAmount) || !Number.isFinite(bankAmount)) {
+      setCashValue(rollup.accounts.cash.starting);
+      setBankValue(rollup.accounts.bank.starting);
+      return;
+    }
     setSaving(true);
     try {
-      await client.put(`/months/${month}/starting-balance`, { amount });
+      await client.put(`/months/${month}/starting-balance`, { cash_amount: cashAmount, bank_amount: bankAmount });
       onSaved();
     } catch (err) {
-      setValue(rollup.starting_balance.actual);
+      setCashValue(rollup.accounts.cash.starting);
+      setBankValue(rollup.accounts.bank.starting);
       toast.error(err.response?.data?.error || "Could not update starting balance");
     } finally {
       setSaving(false);
@@ -99,15 +107,32 @@ function StartingBalanceEditor({ rollup, month, onSaved }) {
   }
 
   return (
-    <input
-      type="number"
-      step="0.01"
-      value={value}
-      disabled={saving}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={save}
-      className="field-input w-36 text-right"
-    />
+    <div className="flex flex-col items-end gap-1.5">
+      <label className="flex items-center gap-2 text-xs text-subtle">
+        Cash
+        <input
+          type="number"
+          step="0.01"
+          value={cashValue}
+          disabled={saving}
+          onChange={(e) => setCashValue(e.target.value)}
+          onBlur={save}
+          className="field-input w-28 text-right"
+        />
+      </label>
+      <label className="flex items-center gap-2 text-xs text-subtle">
+        Bank
+        <input
+          type="number"
+          step="0.01"
+          value={bankValue}
+          disabled={saving}
+          onChange={(e) => setBankValue(e.target.value)}
+          onBlur={save}
+          className="field-input w-28 text-right"
+        />
+      </label>
+    </div>
   );
 }
 
@@ -160,9 +185,13 @@ function MonthlyOverviewSection() {
         <StatCard label="Starting Balance" value={formatCurrency(rollup.starting_balance.actual)} />
         <StatCard label="Budgeted Balance" value={formatCurrency(rollup.left.expected)} />
       </div>
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatCard label="Cash on Hand" value={formatCurrency(rollup.accounts.cash.ending)} />
+        <StatCard label="Cash in Bank" value={formatCurrency(rollup.accounts.bank.ending)} />
+      </div>
       {rollup.is_first_month && (
         <p className="mt-2 text-xs text-subtle">
-          Starting Balance is editable in the table below — this is your first tracked month.
+          Starting Balance (Cash and Bank) is editable in the table below — this is your first tracked month.
         </p>
       )}
 

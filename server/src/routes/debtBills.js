@@ -11,9 +11,9 @@ router.use(requireAuth);
 
 async function fetchItemWithRollup(itemId, userId) {
   const [rows] = await pool.query(
-    `SELECT d.id, d.month, d.due_date, d.is_completed, d.completed_at,
+    `SELECT d.id, d.month, d.due_date, d.is_completed, d.completed_at, d.plan_id, d.bank,
        c.id AS category_id, c.name AS category_name, c.type AS category_type,
-       COALESCE(cb.expected_amount, 0) AS expected,
+       COALESCE(d.installment_amount, cb.expected_amount, 0) AS expected,
        COALESCE((
          SELECT SUM(t.amount) FROM transactions t
          WHERE t.user_id = d.user_id AND t.category_id = d.category_id
@@ -36,9 +36,9 @@ router.get("/", asyncHandler(async (req, res) => {
 
   const params = [req.user.id, month];
   let sql = `
-    SELECT d.id, d.month, d.due_date, d.is_completed, d.completed_at,
+    SELECT d.id, d.month, d.due_date, d.is_completed, d.completed_at, d.plan_id, d.bank,
        c.id AS category_id, c.name AS category_name, c.type AS category_type,
-       COALESCE(cb.expected_amount, 0) AS expected,
+       COALESCE(d.installment_amount, cb.expected_amount, 0) AS expected,
        COALESCE((
          SELECT SUM(t.amount) FROM transactions t
          WHERE t.user_id = d.user_id AND t.category_id = d.category_id
@@ -69,7 +69,7 @@ router.get("/", asyncHandler(async (req, res) => {
 
 router.post("/", asyncHandler(async (req, res) => {
   const month = normalizeMonth(req.body.month);
-  const { category_id, due_date } = req.body;
+  const { category_id, due_date, bank } = req.body;
   if (!month) return res.status(400).json({ error: "A valid month (YYYY-MM) is required" });
   if (!category_id) return res.status(400).json({ error: "Category is required" });
   if (!due_date || !normalizeMonth(due_date)) return res.status(400).json({ error: "A valid due date is required" });
@@ -85,8 +85,8 @@ router.post("/", asyncHandler(async (req, res) => {
 
   const id = crypto.randomUUID();
   await pool.query(
-    `INSERT INTO debt_bill_items (id, user_id, category_id, month, due_date) VALUES (?, ?, ?, ?, ?)`,
-    [id, req.user.id, category_id, month, due_date]
+    `INSERT INTO debt_bill_items (id, user_id, category_id, month, due_date, bank) VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, req.user.id, category_id, month, due_date, bank?.trim() || null]
   );
   await ensureMonthExists(req.user.id, month);
 
