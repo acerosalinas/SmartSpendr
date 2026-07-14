@@ -8,6 +8,85 @@ import client from "../api/client.js";
 import { formatCurrency, formatMonthLabel } from "../utils/format.js";
 import { useToast } from "../context/ToastContext.jsx";
 
+function AmountSavedEditor({ goal, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(goal.amount_saved);
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  const hasOverride = goal.actual_saved_override !== null && goal.actual_saved_override !== undefined;
+
+  function startEdit() {
+    setValue(goal.amount_saved);
+    setEditing(true);
+  }
+
+  async function save() {
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast.error("Amount saved must be zero or a positive number");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSaved(amount);
+      setEditing(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not update amount saved");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function reset() {
+    setSaving(true);
+    try {
+      await onSaved(null);
+      setEditing(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not reset amount saved");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={value}
+          disabled={saving}
+          onChange={(e) => setValue(e.target.value)}
+          className="field-input w-28 text-right"
+        />
+        <button onClick={save} disabled={saving} className="text-xs link-accent">
+          Save
+        </button>
+        <button onClick={() => setEditing(false)} disabled={saving} className="text-xs text-subtle">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-semibold text-heading">{formatCurrency(goal.amount_saved)}</span>
+      <button onClick={startEdit} className="text-xs link-accent">
+        Edit
+      </button>
+      {hasOverride && (
+        <button onClick={reset} disabled={saving} className="text-xs text-subtle hover:underline">
+          Reset
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function GoalDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -78,6 +157,13 @@ export default function GoalDetail() {
     toast.success("Goal updated");
   }
 
+  async function handleActualSaved(amount) {
+    const { data } = await client.patch(`/goals/${id}/actual`, { actual_saved: amount });
+    setGoal(data.goal);
+    setMonths(data.months);
+    toast.success(amount === null ? "Reset to checklist total" : "Amount saved updated");
+  }
+
   if (loading) {
     return (
       <Layout title="Goal Details">
@@ -119,9 +205,9 @@ export default function GoalDetail() {
                 <span className="text-subtle">Target Amount</span>
                 <span className="font-semibold text-heading">{formatCurrency(goal.target_amount)}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex items-center justify-between">
                 <span className="text-subtle">Amount Saved</span>
-                <span className="font-semibold text-heading">{formatCurrency(goal.amount_saved)}</span>
+                <AmountSavedEditor goal={goal} onSaved={handleActualSaved} />
               </div>
               <div className="flex justify-between">
                 <span className="text-subtle">Remaining Balance</span>

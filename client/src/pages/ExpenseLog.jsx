@@ -23,6 +23,7 @@ export default function ExpenseLog() {
   const [loadError, setLoadError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState("");
   const toast = useToast();
 
   async function load() {
@@ -70,17 +71,22 @@ export default function ExpenseLog() {
     }
   }
 
+  const filteredTransactions = useMemo(() => {
+    if (!categoryFilter) return transactions;
+    return transactions.filter((t) => t.category_id === categoryFilter);
+  }, [transactions, categoryFilter]);
+
   const subtotalsByType = useMemo(() => {
     const totals = {};
-    for (const t of transactions) {
+    for (const t of filteredTransactions) {
       totals[t.category_type] = (totals[t.category_type] || 0) + Number(t.amount);
     }
     return totals;
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   return (
     <Layout title="Expense Log" showMonthSwitcher>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-heading">Every transaction, one row at a time</h2>
           <p className="text-sm text-subtle">
@@ -91,6 +97,22 @@ export default function ExpenseLog() {
         <button onClick={() => setShowForm(true)} className="btn-accent">
           + New Transaction
         </button>
+      </div>
+
+      <div className="mb-4 flex items-center gap-2">
+        <label className="field-label mb-0">Category</label>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="field-input w-56"
+        >
+          <option value="">All Categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({TYPE_LABELS[c.type]})
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
@@ -112,14 +134,16 @@ export default function ExpenseLog() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.length === 0 ? (
+                {filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-10 text-center text-subtle">
-                      No transactions logged for this month yet.
+                      {transactions.length === 0
+                        ? "No transactions logged for this month yet."
+                        : "No transactions match this category filter."}
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((t) => (
+                  filteredTransactions.map((t) => (
                     <tr key={t.id} className="border-b divider last:border-0">
                       <td className="px-4 py-3 text-heading">{formatDate(t.txn_date)}</td>
                       <td className="px-4 py-3 text-heading">{t.description}</td>
@@ -150,7 +174,7 @@ export default function ExpenseLog() {
                   ))
                 )}
               </tbody>
-              {transactions.length > 0 && (
+              {filteredTransactions.length > 0 && (
                 <tfoot>
                   {Object.entries(subtotalsByType).map(([type, sum]) => (
                     <tr key={type} className="border-t divider">

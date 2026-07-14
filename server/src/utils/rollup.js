@@ -19,16 +19,18 @@ async function getCategoryTypeTotals(userId, month, type) {
   return { expected: Number(rows[0].expected), actual: Number(rows[0].actual) };
 }
 
-// Net movement (income minus everything else) for the month, split by which
-// account (cash/bank) each transaction was tagged with. Expected/budgeted
+// Net movement (income minus outflows) for the month, split by which account
+// (cash/bank) each transaction was tagged with. Savings contributions are
+// treated as neutral (neither added nor subtracted) -- money set aside is
+// still yours, so it doesn't reduce your spendable balance. Expected/budgeted
 // figures stay account-agnostic -- only realized transactions are tied to
 // a physical account.
 async function getAccountNetTotals(userId, month) {
   const [rows] = await pool.query(
     `SELECT
-       COALESCE(SUM(CASE WHEN tc.type = 'income' THEN t.amount ELSE -t.amount END)
+       COALESCE(SUM(CASE WHEN tc.type = 'income' THEN t.amount WHEN tc.type = 'savings' THEN 0 ELSE -t.amount END)
          FILTER (WHERE t.account = 'cash'), 0) AS cash_net,
-       COALESCE(SUM(CASE WHEN tc.type = 'income' THEN t.amount ELSE -t.amount END)
+       COALESCE(SUM(CASE WHEN tc.type = 'income' THEN t.amount WHEN tc.type = 'savings' THEN 0 ELSE -t.amount END)
          FILTER (WHERE t.account = 'bank'), 0) AS bank_net
      FROM transactions t
      JOIN categories tc ON tc.id = t.category_id
@@ -48,10 +50,11 @@ async function computeSingleMonth(userId, month, startingBalance, startingAccoun
     getAccountNetTotals(userId, month),
   ]);
 
-  const leftExpected =
-    startingBalance.expected + income.expected - savings.expected - debt.expected - bills.expected - expenses.expected;
-  const leftActual =
-    startingBalance.actual + income.actual - savings.actual - debt.actual - bills.actual - expenses.actual;
+  // Savings is intentionally excluded here -- contributing to savings is not
+  // a loss, so it doesn't reduce the Ending Balance (it's still shown as its
+  // own row above for reference).
+  const leftExpected = startingBalance.expected + income.expected - debt.expected - bills.expected - expenses.expected;
+  const leftActual = startingBalance.actual + income.actual - debt.actual - bills.actual - expenses.actual;
 
   const accountsEnding = {
     cash: startingAccounts.cash + accountNet.cash,

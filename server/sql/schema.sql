@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS goals (
   period_months INT NOT NULL,
   bank VARCHAR(100),
   starting_month DATE NOT NULL,
+  actual_saved_override DECIMAL(12,2) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -24,10 +24,20 @@ async function fetchGoalOwnedByUser(goalId, userId) {
   return rows[0] || null;
 }
 
+// The checklist (goal_months) always computes its own total independently of
+// this. actual_saved_override, when set, replaces that computed total for
+// display/progress purposes -- it's a manual override, not a schedule change.
+function resolveAmountSaved(goal, months) {
+  if (goal.actual_saved_override !== null && goal.actual_saved_override !== undefined) {
+    return Number(goal.actual_saved_override);
+  }
+  return months.filter((m) => m.is_completed).reduce((sum, m) => sum + Number(m.target_amount), 0);
+}
+
 router.get("/", asyncHandler(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT g.*,
-       COALESCE(SUM(CASE WHEN gm.is_completed THEN gm.target_amount ELSE 0 END), 0) AS amount_saved
+       COALESCE(g.actual_saved_override, SUM(CASE WHEN gm.is_completed THEN gm.target_amount ELSE 0 END), 0) AS amount_saved
      FROM goals g
      LEFT JOIN goal_months gm ON gm.goal_id = g.id
      WHERE g.user_id = ?
@@ -95,9 +105,7 @@ router.get("/:id", asyncHandler(async (req, res) => {
     [goal.id]
   );
 
-  const amountSaved = months
-    .filter((m) => m.is_completed)
-    .reduce((sum, m) => sum + Number(m.target_amount), 0);
+  const amountSaved = resolveAmountSaved(goal, months);
 
   res.json({ goal: withProgress({ ...goal, amount_saved: amountSaved }), months });
 }));
@@ -124,11 +132,37 @@ router.put("/:id", asyncHandler(async (req, res) => {
     "SELECT * FROM goal_months WHERE goal_id = ? ORDER BY month_number ASC",
     [req.params.id]
   );
-  const amountSaved = months
-    .filter((m) => m.is_completed)
-    .reduce((sum, m) => sum + Number(m.target_amount), 0);
 
   const updatedGoal = await fetchGoalOwnedByUser(req.params.id, req.user.id);
+  const amountSaved = resolveAmountSaved(updatedGoal, months);
+  res.json({ goal: withProgress({ ...updatedGoal, amount_saved: amountSaved }), months });
+}));
+
+// Manual override for the goal's total Amount Saved, independent of which
+// checklist months are checked off. Pass null to clear the override and go
+// back to the checklist-computed total.
+router.patch("/:id/actual", asyncHandler(async (req, res) => {
+  const goal = await fetchGoalOwnedByUser(req.params.id, req.user.id);
+  if (!goal) return res.status(404).json({ error: "Goal not found" });
+
+  const { actual_saved } = req.body;
+  let override = null;
+  if (actual_saved !== null && actual_saved !== undefined) {
+    const amount = Number(actual_saved);
+    if (!Number.isFinite(amount) || amount < 0) {
+      return res.status(400).json({ error: "Actual saved must be zero or a positive number" });
+    }
+    override = amount;
+  }
+
+  await pool.query("UPDATE goals SET actual_saved_override = ? WHERE id = ?", [override, req.params.id]);
+
+  const [months] = await pool.query(
+    "SELECT * FROM goal_months WHERE goal_id = ? ORDER BY month_number ASC",
+    [req.params.id]
+  );
+  const updatedGoal = await fetchGoalOwnedByUser(req.params.id, req.user.id);
+  const amountSaved = resolveAmountSaved(updatedGoal, months);
   res.json({ goal: withProgress({ ...updatedGoal, amount_saved: amountSaved }), months });
 }));
 
@@ -165,9 +199,7 @@ router.patch("/:id/months/:monthId", asyncHandler(async (req, res) => {
     "SELECT * FROM goal_months WHERE goal_id = ? ORDER BY month_number ASC",
     [goal.id]
   );
-  const amountSaved = months
-    .filter((m) => m.is_completed)
-    .reduce((sum, m) => sum + Number(m.target_amount), 0);
+  const amountSaved = resolveAmountSaved(goal, months);
 
   res.json({ goal: withProgress({ ...goal, amount_saved: amountSaved }), months });
 }));
