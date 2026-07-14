@@ -87,6 +87,71 @@ function AmountSavedEditor({ goal, onSaved }) {
   );
 }
 
+function ActualAmountEditor({ month, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(month.actual_amount ?? "");
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  const hasActual = month.actual_amount !== null && month.actual_amount !== undefined;
+
+  function startEdit() {
+    setValue(month.actual_amount ?? "");
+    setEditing(true);
+  }
+
+  async function save() {
+    const trimmed = String(value).trim();
+    const amount = trimmed === "" ? null : Number(trimmed);
+    if (amount !== null && (!Number.isFinite(amount) || amount < 0)) {
+      toast.error("Actual amount must be zero or a positive number");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSaved(amount);
+      setEditing(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not update actual amount");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={value}
+          disabled={saving}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          className="field-input w-24 text-right"
+        />
+        <button onClick={save} disabled={saving} className="text-xs link-accent">
+          Save
+        </button>
+        <button onClick={() => setEditing(false)} disabled={saving} className="text-xs text-subtle">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={startEdit}
+      className="font-semibold hover:underline"
+      style={{ color: hasActual ? "var(--accent)" : "var(--text-muted)" }}
+    >
+      {hasActual ? formatCurrency(month.actual_amount) : "Set amount"}
+    </button>
+  );
+}
+
 export default function GoalDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -164,6 +229,13 @@ export default function GoalDetail() {
     toast.success(amount === null ? "Reset to checklist total" : "Amount saved updated");
   }
 
+  async function handleMonthActual(month, amount) {
+    const { data } = await client.patch(`/goals/${id}/months/${month.id}/actual`, { actual_amount: amount });
+    setGoal(data.goal);
+    setMonths(data.months);
+    toast.success(amount === null ? "Actual amount cleared" : "Actual amount updated");
+  }
+
   if (loading) {
     return (
       <Layout title="Goal Details">
@@ -232,28 +304,44 @@ export default function GoalDetail() {
             Monthly Breakdown
           </h3>
           <ul className="divide-y divider">
-            {months.map((month) => (
-              <li key={month.id} className="flex items-center justify-between py-3">
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={month.is_completed}
-                    onChange={() => toggleMonth(month)}
-                    className="h-5 w-5 rounded"
-                    style={{ accentColor: "var(--accent)" }}
-                  />
-                  <span className="text-sm font-medium text-heading">
-                    Month {month.month_number} &middot; {formatMonthLabel(month.month_label)}
-                  </span>
-                </label>
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: month.is_completed ? "var(--accent)" : "var(--text)" }}
-                >
-                  {formatCurrency(month.target_amount)}
-                </span>
-              </li>
-            ))}
+            {months.map((month) => {
+              const prevMonth = months.find((m) => m.month_number === month.month_number - 1);
+              const carriedOver = Number(prevMonth?.rollover_to_next) || 0;
+              return (
+                <li key={month.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={month.is_completed}
+                      onChange={() => toggleMonth(month)}
+                      className="h-5 w-5 rounded"
+                      style={{ accentColor: "var(--accent)" }}
+                    />
+                    <span className="text-sm font-medium text-heading">
+                      Month {month.month_number} &middot; {formatMonthLabel(month.month_label)}
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-5 text-sm">
+                    <div className="text-right">
+                      <p className="text-xs text-subtle">Expected</p>
+                      <p
+                        className="font-semibold"
+                        style={{ color: month.is_completed ? "var(--accent)" : "var(--text)" }}
+                      >
+                        {formatCurrency(month.target_amount)}
+                      </p>
+                      {carriedOver > 0 && (
+                        <p className="text-xs text-subtle">+{formatCurrency(carriedOver)} carried over</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-subtle">Actual</p>
+                      <ActualAmountEditor month={month} onSaved={(amount) => handleMonthActual(month, amount)} />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
 

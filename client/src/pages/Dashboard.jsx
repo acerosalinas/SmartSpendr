@@ -140,6 +140,7 @@ function MonthlyOverviewSection() {
   const { currentMonth } = useMonth();
   const { theme } = useTheme();
   const [rollup, setRollup] = useState(null);
+  const [totalSavings, setTotalSavings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [view, setView] = useState("table");
@@ -165,6 +166,14 @@ function MonthlyOverviewSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth]);
 
+  useEffect(() => {
+    // All-time total, not month-scoped -- only needs to be fetched once.
+    client
+      .get("/savings")
+      .then(({ data }) => setTotalSavings(data.total_saved))
+      .catch(() => {});
+  }, []);
+
   if (loading) return <p className="text-subtle">Loading...</p>;
   if (loadError) return <p className="text-sm text-red-500">{loadError}</p>;
 
@@ -185,9 +194,10 @@ function MonthlyOverviewSection() {
         <StatCard label="Starting Balance" value={formatCurrency(rollup.starting_balance.actual)} />
         <StatCard label="Budgeted Balance" value={formatCurrency(rollup.left.expected)} />
       </div>
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Cash on Hand" value={formatCurrency(rollup.accounts.cash.ending)} />
         <StatCard label="Cash in Bank" value={formatCurrency(rollup.accounts.bank.ending)} />
+        <StatCard label="Total Savings" value={formatCurrency(totalSavings ?? 0)} />
       </div>
       {rollup.is_first_month && (
         <p className="mt-2 text-xs text-subtle">

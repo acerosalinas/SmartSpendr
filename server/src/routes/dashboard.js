@@ -9,7 +9,10 @@ router.use(requireAuth);
 router.get("/", asyncHandler(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT g.id, g.goal_name, g.target_amount,
-       COALESCE(SUM(CASE WHEN gm.is_completed THEN gm.target_amount ELSE 0 END), 0) AS amount_saved
+       COALESCE(g.actual_saved_override,
+         SUM(CASE WHEN gm.actual_amount IS NOT NULL THEN gm.actual_amount
+                  WHEN gm.is_completed THEN gm.target_amount ELSE 0 END),
+       0) AS amount_saved
      FROM goals g
      LEFT JOIN goal_months gm ON gm.goal_id = g.id
      WHERE g.user_id = ?

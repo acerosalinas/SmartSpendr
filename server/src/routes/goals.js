@@ -24,6 +24,14 @@ async function fetchGoalOwnedByUser(goalId, userId) {
   return rows[0] || null;
 }
 
+// Per-month contribution: an entered actual_amount takes precedence over the
+// checklist checkbox (which still contributes its full target_amount when
+// checked and no actual_amount has been recorded yet).
+function monthContribution(m) {
+  if (m.actual_amount !== null && m.actual_amount !== undefined) return Number(m.actual_amount);
+  return m.is_completed ? Number(m.target_amount) : 0;
+}
+
 // The checklist (goal_months) always computes its own total independently of
 // this. actual_saved_override, when set, replaces that computed total for
 // display/progress purposes -- it's a manual override, not a schedule change.
@@ -31,13 +39,16 @@ function resolveAmountSaved(goal, months) {
   if (goal.actual_saved_override !== null && goal.actual_saved_override !== undefined) {
     return Number(goal.actual_saved_override);
   }
-  return months.filter((m) => m.is_completed).reduce((sum, m) => sum + Number(m.target_amount), 0);
+  return months.reduce((sum, m) => sum + monthContribution(m), 0);
 }
 
 router.get("/", asyncHandler(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT g.*,
-       COALESCE(g.actual_saved_override, SUM(CASE WHEN gm.is_completed THEN gm.target_amount ELSE 0 END), 0) AS amount_saved
+       COALESCE(g.actual_saved_override,
+         SUM(CASE WHEN gm.actual_amount IS NOT NULL THEN gm.actual_amount
+                  WHEN gm.is_completed THEN gm.target_amount ELSE 0 END),
+       0) AS amount_saved
      FROM goals g
      LEFT JOIN goal_months gm ON gm.goal_id = g.id
      WHERE g.user_id = ?
@@ -194,6 +205,78 @@ router.patch("/:id/months/:monthId", asyncHandler(async (req, res) => {
     is_completed ? new Date() : null,
     req.params.monthId,
   ]);
+
+  const [months] = await pool.query(
+    "SELECT * FROM goal_months WHERE goal_id = ? ORDER BY month_number ASC",
+    [goal.id]
+  );
+  const amountSaved = resolveAmountSaved(goal, months);
+
+  res.json({ goal: withProgress({ ...goal, amount_saved: amountSaved }), months });
+}));
+
+// Records how much was actually saved in a given month. If it falls short of
+// that month's target_amount, the shortfall is added onto the NEXT month's
+// target_amount (rollover) -- re-editing (or clearing) reverses the old
+// rollover before applying the new one, so this stays correct across edits.
+// There's no month past the last one to roll into, so a shortfall on the
+// final month simply isn't carried anywhere.
+router.patch("/:id/months/:monthId/actual", asyncHandler(async (req, res) => {
+  const goal = await fetchGoalOwnedByUser(req.params.id, req.user.id);
+  if (!goal) return res.status(404).json({ error: "Goal not found" });
+
+  const [monthRows] = await pool.query("SELECT * FROM goal_months WHERE id = ? AND goal_id = ?", [
+    req.params.monthId,
+    goal.id,
+  ]);
+  const month = monthRows[0];
+  if (!month) return res.status(404).json({ error: "Month not found" });
+
+  const { actual_amount } = req.body;
+  let newActual = null;
+  if (actual_amount !== null && actual_amount !== undefined && actual_amount !== "") {
+    const amount = Number(actual_amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      return res.status(400).json({ error: "Actual amount must be zero or a positive number" });
+    }
+    newActual = amount;
+  }
+
+  const [nextRows] = await pool.query("SELECT * FROM goal_months WHERE goal_id = ? AND month_number = ?", [
+    goal.id,
+    month.month_number + 1,
+  ]);
+  const nextMonth = nextRows[0] || null;
+
+  const oldRollover = Number(month.rollover_to_next) || 0;
+  const shortfall = newActual !== null ? Math.max(Number(month.target_amount) - newActual, 0) : 0;
+  const newRollover = nextMonth ? shortfall : 0;
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    if (nextMonth && oldRollover !== newRollover) {
+      await connection.query("UPDATE goal_months SET target_amount = target_amount - ? + ? WHERE id = ?", [
+        oldRollover,
+        newRollover,
+        nextMonth.id,
+      ]);
+    }
+
+    await connection.query("UPDATE goal_months SET actual_amount = ?, rollover_to_next = ? WHERE id = ?", [
+      newActual,
+      newRollover,
+      month.id,
+    ]);
+
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 
   const [months] = await pool.query(
     "SELECT * FROM goal_months WHERE goal_id = ? ORDER BY month_number ASC",

@@ -31,7 +31,13 @@ CREATE TABLE IF NOT EXISTS goal_months (
   month_label DATE NOT NULL,
   target_amount DECIMAL(12,2) NOT NULL,
   is_completed BOOLEAN DEFAULT FALSE,
-  completed_at TIMESTAMP NULL
+  completed_at TIMESTAMP NULL,
+  -- Actual amount saved that month (NULL = not yet recorded). When set and
+  -- less than target_amount, the shortfall is added onto the next month's
+  -- target_amount; rollover_to_next records how much THIS month pushed
+  -- forward, so a later edit can cleanly reverse and reapply it.
+  actual_amount DECIMAL(12,2) NULL,
+  rollover_to_next DECIMAL(12,2) NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_goal_months_goal ON goal_months(goal_id);
